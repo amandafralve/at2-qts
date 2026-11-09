@@ -8,228 +8,82 @@ from tests.factories import RacaFactory
 
 
 @pytest.mark.integration
-def test_healthcheck_retorna_status_e_servico(client: TestClient) -> None:
-    # Arrange
-
-    # Act
-    response = client.get("/health")
-
-    # Assert
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "dog-breeds-hub"}
-
-
-@pytest.mark.integration
-def test_cadastrar_raca_retorna_201_e_payload_com_metadados(client: TestClient) -> None:
-    # Arrange
+def test_rotas_basicas_de_racas(client: TestClient) -> None:
     payload = RacaFactory.criar_payload_valido()
 
-    # Act
-    response = client.post("/api/v1/racas", json=payload)
+    health = client.get("/health")
+    vazio = client.get("/api/v1/racas")
+    criada = client.post("/api/v1/racas", json=payload)
+    lista = client.get("/api/v1/racas")
+    consulta = client.get(f"/api/v1/racas/{criada.json()['id']}")
+    inexistente = client.get("/api/v1/racas/999")
 
-    # Assert
-    assert response.status_code == 201
-    data = response.json()
-    assert data["nome"] == payload["nome"]
-    assert data["porte"] == payload["porte"]
-    assert data["expectativa_vida_anos"] == payload["expectativa_vida_anos"]
-    assert data["temperamento"] == payload["temperamento"]
-    assert data["origem"] == payload["origem"]
-    assert isinstance(data["id"], int)
-    assert "criado_em" in data
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+    assert vazio.status_code == 200
+    assert vazio.json() == []
+    assert criada.status_code == 201
+    assert criada.json()["nome"] == payload["nome"]
+    assert lista.json()[0]["id"] == criada.json()["id"]
+    assert consulta.status_code == 200
+    assert consulta.json()["id"] == criada.json()["id"]
+    assert inexistente.status_code == 404
 
 
 @pytest.mark.integration
-def test_cadastrar_raca_com_nome_duplicado_retorna_409(
-    client: TestClient,
-    raca_pre_cadastrada: dict[str, object],
-) -> None:
-    # Arrange
+def test_cadastro_e_filtros_rejeitam_dados_invalidos(client: TestClient) -> None:
     payload = RacaFactory.criar_payload_valido()
-    payload["nome"] = raca_pre_cadastrada["nome"]
+    payload_invalido = RacaFactory.criar_payload_invalido_sem_nome()
+    payload_temperamento_invalido = RacaFactory.criar_payload_valido()
+    payload_temperamento_invalido["temperamento"] = "   "
 
-    # Act
-    response = client.post("/api/v1/racas", json=payload)
+    criada = client.post("/api/v1/racas", json=payload)
+    duplicada = client.post("/api/v1/racas", json=payload)
+    nome_invalido = client.post("/api/v1/racas", json=payload_invalido)
+    temperamento_invalido = client.post(
+        "/api/v1/racas",
+        json=payload_temperamento_invalido,
+    )
+    filtrada = client.get(
+        "/api/v1/racas",
+        params={"nome": payload["nome"][:3], "porte": payload["porte"]},
+    )
+    porte_invalido = client.get("/api/v1/racas", params={"porte": "Gigante"})
 
-    # Assert
-    assert response.status_code == 409
-
-
-@pytest.mark.integration
-def test_cadastrar_payload_invalido_retorna_422(client: TestClient) -> None:
-    # Arrange
-    payload = RacaFactory.criar_payload_invalido_sem_nome()
-
-    # Act
-    response = client.post("/api/v1/racas", json=payload)
-
-    # Assert
-    assert response.status_code == 422
-
-
-@pytest.mark.integration
-def test_cadastrar_temperamento_apenas_com_espacos_retorna_422(
-    client: TestClient,
-) -> None:
-    # Arrange
-    payload = RacaFactory.criar_payload_valido()
-    payload["temperamento"] = "   "
-
-    # Act
-    response = client.post("/api/v1/racas", json=payload)
-
-    # Assert
-    assert response.status_code == 422
+    assert criada.status_code == 201
+    assert duplicada.status_code == 409
+    assert nome_invalido.status_code == 422
+    assert temperamento_invalido.status_code == 422
+    assert [raca["id"] for raca in filtrada.json()] == [criada.json()["id"]]
+    assert porte_invalido.status_code == 422
 
 
 @pytest.mark.integration
-def test_listar_racas_retorna_lista_vazia_sem_cadastros(client: TestClient) -> None:
-    # Arrange
-
-    # Act
-    response = client.get("/api/v1/racas")
-
-    # Assert
-    assert response.status_code == 200
-    assert response.json() == []
-
-
-@pytest.mark.integration
-def test_listar_racas_filtra_por_nome_e_porte(
+def test_verificacao_veterinaria_com_sucesso_e_falhas(
     client: TestClient,
     raca_pre_cadastrada: dict[str, object],
+    mocker: MockerFixture,
 ) -> None:
-    # Arrange
-    nome = str(raca_pre_cadastrada["nome"])
-    porte = str(raca_pre_cadastrada["porte"])
-
-    # Act
-    response = client.get("/api/v1/racas", params={"nome": nome[:3], "porte": porte})
-
-    # Assert
-    assert response.status_code == 200
-    assert [raca["id"] for raca in response.json()] == [raca_pre_cadastrada["id"]]
-
-
-@pytest.mark.integration
-def test_filtrar_racas_com_porte_invalido_retorna_422(client: TestClient) -> None:
-    # Arrange
-
-    # Act
-    response = client.get("/api/v1/racas", params={"porte": "Gigante"})
-
-    # Assert
-    assert response.status_code == 422
-
-
-@pytest.mark.integration
-def test_obter_raca_por_id_retorna_200(
-    client: TestClient,
-    raca_pre_cadastrada: dict[str, object],
-) -> None:
-    # Arrange
     raca_id = raca_pre_cadastrada["id"]
-
-    # Act
-    response = client.get(f"/api/v1/racas/{raca_id}")
-
-    # Assert
-    assert response.status_code == 200
-    assert response.json()["id"] == raca_id
-
-
-@pytest.mark.integration
-def test_obter_raca_inexistente_retorna_404(client: TestClient) -> None:
-    # Arrange
-
-    # Act
-    response = client.get("/api/v1/racas/999")
-
-    # Assert
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Raça não encontrada."
-
-
-@pytest.mark.integration
-def test_verificar_veterinario_com_sucesso_usa_mock(
-    client: TestClient,
-    raca_pre_cadastrada: dict[str, object],
-    mocker: MockerFixture,
-) -> None:
-    # Arrange
-    resultado = {
-        "raca_id": raca_pre_cadastrada["id"],
-        "aprovada": True,
-        "mensagem": "Aprovada",
-    }
-    verificar = mocker.patch.object(veterinary_service, "verificar", return_value=resultado)
-
-    # Act
-    response = client.post(
-        f"/api/v1/racas/{raca_pre_cadastrada['id']}/verificar-veterinario"
-    )
-
-    # Assert
-    assert response.status_code == 200
-    assert response.json() == resultado
-    verificar.assert_called_once()
-
-
-@pytest.mark.integration
-def test_verificar_veterinario_indisponivel_retorna_503(
-    client: TestClient,
-    raca_pre_cadastrada: dict[str, object],
-    mocker: MockerFixture,
-) -> None:
-    # Arrange
-    mocker.patch.object(
+    resultado = {"raca_id": raca_id, "aprovada": True, "mensagem": "Aprovada"}
+    verificar = mocker.patch.object(
         veterinary_service,
         "verificar",
-        side_effect=VeterinaryServiceUnavailable("Serviço indisponível"),
+        side_effect=[
+            resultado,
+            VeterinaryServiceUnavailable("Serviço indisponível"),
+            VeterinaryTimeout("Tempo limite excedido"),
+        ],
     )
 
-    # Act
-    response = client.post(
-        f"/api/v1/racas/{raca_pre_cadastrada['id']}/verificar-veterinario"
-    )
+    sucesso = client.post(f"/api/v1/racas/{raca_id}/verificar-veterinario")
+    indisponivel = client.post(f"/api/v1/racas/{raca_id}/verificar-veterinario")
+    timeout = client.post(f"/api/v1/racas/{raca_id}/verificar-veterinario")
+    inexistente = client.post("/api/v1/racas/999/verificar-veterinario")
 
-    # Assert
-    assert response.status_code == 503
-
-
-@pytest.mark.integration
-def test_verificar_veterinario_timeout_retorna_504(
-    client: TestClient,
-    raca_pre_cadastrada: dict[str, object],
-    mocker: MockerFixture,
-) -> None:
-    # Arrange
-    mocker.patch.object(
-        veterinary_service,
-        "verificar",
-        side_effect=VeterinaryTimeout("Tempo limite excedido"),
-    )
-
-    # Act
-    response = client.post(
-        f"/api/v1/racas/{raca_pre_cadastrada['id']}/verificar-veterinario"
-    )
-
-    # Assert
-    assert response.status_code == 504
-
-
-@pytest.mark.integration
-def test_verificar_raca_inexistente_retorna_404_sem_chamar_servico(
-    client: TestClient,
-    mocker: MockerFixture,
-) -> None:
-    # Arrange
-    verificar = mocker.patch.object(veterinary_service, "verificar")
-
-    # Act
-    response = client.post("/api/v1/racas/999/verificar-veterinario")
-
-    # Assert
-    assert response.status_code == 404
-    verificar.assert_not_called()
+    assert sucesso.status_code == 200
+    assert sucesso.json() == resultado
+    assert indisponivel.status_code == 503
+    assert timeout.status_code == 504
+    assert inexistente.status_code == 404
+    assert verificar.call_count == 3

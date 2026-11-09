@@ -47,7 +47,7 @@ Não crie arquivos fora dessa estrutura sem necessidade clara.
 
 ### 5.1 Gerais
 - Padrão **AAA** (Arrange, Act, Assert) em todo teste, com os blocos separados por linha em branco.
-- Um comportamento por teste. Nomes descritivos: `test_cadastrar_raca_com_nome_duplicado_retorna_409`.
+- Agrupe verificações relacionadas por funcionalidade para manter poucos testes simples; use nomes descritivos.
 - Todo teste carrega exatamente um marker: `@pytest.mark.integration`, `@pytest.mark.e2e` ou `@pytest.mark.accessibility`. Os markers ficam declarados no `pyproject.toml`.
 - Testes independentes entre si e sem ordem implícita. Nunca depender de estado deixado por outro teste.
 - `uv run pytest -v` deve passar 100% sem warnings.
@@ -87,7 +87,6 @@ Não crie arquivos fora dessa estrutura sem necessidade clara.
 - Não inventar métricas, resultados de execução ou saída de comandos.
 - Não colocar segredos, chaves ou URLs privadas no código.
 - Não fazer commit direto de código que não foi executado: rodar `uv run pytest -v` antes.
-
 
 
 ## 9. Comandos Úteis

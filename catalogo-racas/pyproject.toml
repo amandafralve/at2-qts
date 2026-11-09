@@ -1,0 +1,38 @@
+[project]
+name = "catalogo-racas"
+version = "0.1.0"
+description = "Catálogo de Raças de Cães para testes de qualidade QTS"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "pydantic>=2.10.0",
+    "jinja2>=3.1.4",
+    "python-multipart>=0.0.12",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-mock>=3.14.0",
+    "pytest-playwright>=0.6.0",
+    "axe-playwright-python>=0.1.6",
+    "faker>=33.0.0",
+    "httpx>=0.28.0",
+    "locust>=2.32.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+addopts = "-v --strict-markers"
+markers = [
+    "integration: testes de integração de API e repositório",
+    "e2e: testes ponta a ponta com Playwright",
+    "accessibility: auditorias WCAG 2.1 AA com Axe-core e teclado",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
